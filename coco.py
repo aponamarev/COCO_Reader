@@ -215,6 +215,9 @@ if __name__ == "__main__":
              main_controller=mc, resize_dim=(768, 768))
     print "The name of the dataset: {}".format(c.name)
     print "Batch provides images for:  \n", c.BATCH_CLASSES
+
+    anns = c.process_annotations()
+
     for i in range(10000):
         start_timer = time.time()
         image_per_batch,\

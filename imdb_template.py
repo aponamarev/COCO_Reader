@@ -2,8 +2,9 @@
 """
 General image database wrapper that provides a common methods for image processing
 """
+from __future__ import print_function
 import numpy as np
-import sys, os
+import sys, os, time
 from util import batch_iou
 from ImRead import ImRead
 from Resize import Resize
@@ -244,6 +245,68 @@ class imdb_template(object):
         :return: int - the size of the epoch
         """
         raise NotImplementedError
+
+    def process_annotations(self):
+        """
+        Converts all annotations into a list
+
+        :return: list that can be processed tf.train.slice_input_producer
+        """
+
+        anns = {
+            'impath_processed': [],
+            'label_processed': [],
+            'gtbox_processed': [],
+            'aids_processed': [],
+            'deltas_processed': []
+        }
+
+        report_frec = 1000
+        print("Starting annotation processing. It may take a while. The progress will be reported for every {} records.".format(report_frec))
+
+        start_timer = time.time()
+
+        for _id in xrange(self.provide_epoch_size()):
+
+            img_id = self.provide_img_id(_id)
+
+            file_path = os.path.join(self.IMAGES_PATH, self.provide_img_file_name(img_id))
+            # have to read actual image to determine the incoming size and use this value to resize bboxes
+            im = self.resize.imResize(self.imread.read(file_path))
+
+            try:
+                # add labels
+                labels = self.provide_img_tags(img_id)
+
+                # add ground truth bounding boxes
+                gtbboxes = self.provide_img_gtbboxes(img_id)
+                # provide anchor ids for each image
+                aids = self.find_anchor_ids(gtbboxes)
+                # calculate deltas for each anchor and add them to the delta_per_batch
+                deltas = self.estimate_deltas(gtbboxes, aids)
+
+                # add the image, labels, bounding boxes, image ANCHOR_BOX, deltas
+                anns['impath_processed'].append(file_path)
+                anns['label_processed'].append(labels)
+                anns['gtbox_processed'].append(gtbboxes)
+                anns['aids_processed'].append(aids)
+                anns['deltas_processed'].append(deltas)
+
+            except:
+                pass
+
+            if _id % report_frec == 0 and _id > 0:
+                end_timer = time.time()
+                avg_time = (end_timer - start_timer)/float(_id)
+                records_left = self.provide_epoch_size()-_id
+                print("{} annotations were processed. The average speed is {:.3f} per image. Time elapsed {:.1f} seconds. {} records remain. Remaining time {:.1f} seconds.".\
+                    format(_id, avg_time, time.time()-start_timer, records_left, records_left*avg_time))
+
+        return anns
+
+
+
+
 
     def read_batch(self, step, gtbbox_flag=True):
         """
