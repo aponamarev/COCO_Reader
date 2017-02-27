@@ -136,8 +136,13 @@ class coco(IMDB):
         ann_ids = self.coco.getAnnIds(imgIds=[id], catIds=self.catIds, iscrowd=None)
         # get all annotations available
         anns = self.coco.loadAnns(ids=ann_ids)
+
         # parse annotations into a list
-        cat_ids = [ann['category_id'] for ann in anns]
+        cat_ids = []
+        for ann in anns:
+            if ann['iscrowd']!=1:
+                cat_ids.append(ann['category_id'])
+
         if coco_labels:
             return cat_ids
         else:
@@ -145,7 +150,7 @@ class coco(IMDB):
             cat_ids = [self.BATCH_CLASSES.index(cat['name']) for cat in cats]
         return cat_ids
 
-    def provide_img_gtbboxes(self, id):
+    def provide_img_gtbboxes(self, id, resize=True):
         """
         Protocol describing the implementation of a method that provides ground truth bounding boxes
         for the image file based on an image id.
@@ -163,7 +168,7 @@ class coco(IMDB):
         anns = self.coco.loadAnns(ids=ann_ids)
         # parse annotations into a list
         for ann in anns:
-            bbox = self.resize.bboxResize(ann['bbox'])
+            bbox = self.resize.bboxResize(ann['bbox']) if resize else ann['bbox']
             bboxes.append([bbox[0] + bbox[2] / 2,
                            bbox[1] + bbox[3] / 2,
                            bbox[2],

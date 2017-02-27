@@ -192,6 +192,8 @@ class imdb_template(object):
             # unpack the box
             box_cx, box_cy, box_w, box_h = box
             # initialize a delta array [x,y,w,h]
+            if not(box_w > 0) or not(box_h > 0):
+                raise ValueError("Incorrect bbox size: height {}, width {}".format(box_h, box_w))
             delta = [0] * 4
             delta[0] = (box_cx - self.ANCHOR_BOX[aid][0]) / box_w
             delta[1] = (box_cy - self.ANCHOR_BOX[aid][1]) / box_h
@@ -218,7 +220,7 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def provide_img_gtbboxes(self, id):
+    def provide_img_gtbboxes(self, id, resize=True):
         """
         Protocol describing the implementation of a method that provides ground truth bounding boxes
         for the image file based on an image id. Should be implemented for each of the datasets separately
@@ -271,15 +273,13 @@ class imdb_template(object):
             img_id = self.provide_img_id(_id)
 
             file_path = os.path.join(self.IMAGES_PATH, self.provide_img_file_name(img_id))
-            # have to read actual image to determine the incoming size and use this value to resize bboxes
-            im = self.resize.imResize(self.imread.read(file_path))
 
             try:
                 # add labels
                 labels = self.provide_img_tags(img_id)
 
                 # add ground truth bounding boxes
-                gtbboxes = self.provide_img_gtbboxes(img_id)
+                gtbboxes = self.provide_img_gtbboxes(img_id, resize=False)
                 # provide anchor ids for each image
                 aids = self.find_anchor_ids(gtbboxes)
                 # calculate deltas for each anchor and add them to the delta_per_batch
