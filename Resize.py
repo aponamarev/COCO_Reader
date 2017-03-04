@@ -7,6 +7,7 @@ Implementation for others classes will be explored later. Current implementation
 The class is initialized with:
     :param: dimensions - 1d [height, width] array
 """
+from __future__ import print_function
 import cv2, sys
 import numpy as np
 
@@ -76,7 +77,7 @@ class Resize(object):
             h, w, _ = [float(dim) for dim in im.shape]
             shape = (w, h)
         except:
-            print "Unexpected error:", sys.exc_info()[0]
+            print("Unexpected error:", sys.exc_info()[0])
             raise
         self.dimension_received = shape
 
@@ -124,6 +125,6 @@ if __name__ == '__main__':
                                        (resized_ann[0] + resized_ann[2] / 2, resized_ann[1] + resized_ann[3] / 2),
                                        color=256, thickness=2)
     plt.imshow(misc.toimage(resized_im_ann))
-    print "resize verification completed successfully!"
+    print("resize verification completed successfully!")
 
 
