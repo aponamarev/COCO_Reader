@@ -3,6 +3,7 @@
 General image database wrapper that provides a common methods for image processing
 """
 from __future__ import print_function
+import tensorflow as tf
 import numpy as np
 import sys, os, time
 from util import batch_iou
@@ -17,11 +18,35 @@ class imdb_template(object):
     IMAGES_PATH = "path to be provided"
 
     def __init__(self, main_controller, resize_dim=(1024, 1024), feature_map_size=(32, 32)):
+
+        prefetched_batches = 4
+
         self.mc = main_controller
         self.FEATURE_MAP_SIZE = feature_map_size  # width, height
         self.INPUT_RES = resize_dim  # width, height
         self.imread = ImRead(bgr2rgd_flag=False)
         self.resize = Resize(dimensinos=resize_dim)
+
+        # Define variables that will be used for prefetching with TensorFlow
+
+        queue_size = self.mc.BATCH_SIZE * prefetched_batches
+
+        self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
+        self.__queue = tf.FIFOQueue(capacity=queue_size,
+                                    dtypes=self.mc.OUTPUT_DTYPES,
+                                    shapes=self.mc.OUTPUT_SHAPES)
+        self.__enqueue = self.__queue.enqueue_many(self.__pipeline_inputs)
+        self.__dequeue = self.__queue.dequeue()
+        self.dequeue_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size)
+
+
+    def enqueue_batch(self, inputs, sess):
+        assert len(self.__pipeline_inputs)==len(inputs),\
+            "Provided inputs are incorrect. Method is expecting a list of {} elements. {} elements were provided.".\
+                format(len(self.__pipeline_inputs), len(inputs))
+        feed_dict = {pipeline_input: value for pipeline_input, value in zip(self.__pipeline_inputs, inputs)}
+        sess.run(self.__enqueue, feed_dict = feed_dict)
+
 
     @property
     def mc(self):
@@ -29,24 +54,42 @@ class imdb_template(object):
 
     @mc.setter
     def mc(self, main_controller):
+        # Let's verify all important attributes
+        try:
+            assert type(main_controller.OUTPUT_SHAPES) == list,\
+                "Please provide the list of OUTPUT_SHAPES ({} was provided). This list will be used to describe tensors to be prefetched in TensorFlow".\
+                    format(type(main_controller.OUTPUT_SHAPES).__name__)
+        except:
+            raise AttributeError("mc.OUTPUT_SHAPES was not provided. Please provide the list of OUTPUT_SHAPES. This list will be used to describe tensors to be prefetched in TensorFlow")
+
+        try:
+            assert type(main_controller.OUTPUT_DTYPES) == list, \
+                "Please provide the list of OUTPUT_DTYPES ({} was provided). This list will be used to describe the data format of tensors to be prefetched in TensorFlow". \
+                    format(type(main_controller.OUTPUT_DTYPES).__name__)
+        except:
+            raise AttributeError("mc.OUTPUT_DTYPES was not provided. Please provide the list of OUTPUT_DTYPES. This list will be used to describe the data format of tensors to be prefetched in TensorFlow")
+
+        # make sure that the length of OUTPUT_SHAPES and OUTPUT_DTYPES is the same
+        assert len(main_controller.OUTPUT_SHAPES)==len(main_controller.OUTPUT_DTYPES),\
+            "Incorrect mc.OUTPUT_SHAPES (len={}) and mc.OUTPUT_DTYPES (len={}) provided. These attributes should have the same legth.".\
+                format(len(main_controller.OUTPUT_SHAPES), len(main_controller.OUTPUT_DTYPES))
+
         try:
             assert type(main_controller.OUTPUT_RES) == list, \
-                "Please provde the output resolution mc.OUTPUT_RES that describes feature maps size of FCN as a list [width, height]. Will be used for bbox setup"
+                "Please provide the output resolution mc.OUTPUT_RES that describes feature maps size of FCN as a list [width, height]. Will be used for bbox setup"
         except:
-            assert False,\
-                "Please provde the output resolution mc.OUTPUT_RES that describes feature maps size of FCN. Will be used for bbox setup"
+            raise AttributeError("mc.OUTPUT_RES was not provided. Please provide the output resolution mc.OUTPUT_RES that describes feature maps size of FCN. Will be used for bbox setup")
 
         try:
             assert type(main_controller.BATCH_SIZE) == int and main_controller.BATCH_SIZE > 0, "Incorrect mc.batch_size"
         except:
-            assert False, "Incorrect mc.batch_size"
+            raise AttributeError("mc.BATCH_SIZE was not provided.")
 
         try:
             assert type(main_controller.IMAGES_PATH) == str,\
                 "Incorrect images path was provided. mc.IMAGES_PATH should be provided."
         except:
-            assert False,\
-                "Incorrect images path was provided. mc.IMAGES_PATH should be provided."
+            raise AttributeError("mc.IMAGES_PATH was not provided.")
 
         self.__mc = main_controller
         self.IMAGES_PATH = main_controller.IMAGES_PATH
@@ -304,10 +347,6 @@ class imdb_template(object):
 
         return anns
 
-
-
-
-
     def read_batch(self, step, gtbbox_flag=True):
         """
         This function reads mc.batch_size images
@@ -366,4 +405,6 @@ class imdb_template(object):
                 pass
 
         return image_per_batch, label_per_batch, gtbox_per_batch, aids_per_batch, deltas_per_batch
+
+
 
