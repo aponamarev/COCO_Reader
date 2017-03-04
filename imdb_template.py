@@ -17,9 +17,7 @@ class imdb_template(object):
     FEATURE_MAP_SIZE = None
     IMAGES_PATH = "path to be provided"
 
-    def __init__(self, main_controller, resize_dim=(1024, 1024), feature_map_size=(32, 32)):
-
-        prefetched_batches = 4
+    def __init__(self, main_controller, resize_dim=(1024, 1024), feature_map_size=(32, 32), prefetched_batches=5):
 
         self.mc = main_controller
         self.FEATURE_MAP_SIZE = feature_map_size  # width, height
@@ -33,13 +31,13 @@ class imdb_template(object):
 
         self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=[self.mc.BATCH_SIZE] + sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
 
-        self.__queue = tf.FIFOQueue(capacity=queue_size,
-                                    dtypes=self.mc.OUTPUT_DTYPES,
-                                    shapes=self.mc.OUTPUT_SHAPES)
+        self.queue = tf.FIFOQueue(capacity=queue_size,
+                                  dtypes=self.mc.OUTPUT_DTYPES,
+                                  shapes=self.mc.OUTPUT_SHAPES)
 
-        self.__enqueue = self.__queue.enqueue_many(self.__pipeline_inputs)
-        self.__dequeue = self.__queue.dequeue()
-        self.dequeue_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size)
+        self.__enqueue = self.queue.enqueue_many(self.__pipeline_inputs)
+        self.__dequeue = self.queue.dequeue()
+        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size)
 
 
     def enqueue_batch(self, inputs, sess):
