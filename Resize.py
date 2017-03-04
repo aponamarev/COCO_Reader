@@ -57,7 +57,8 @@ class Resize(object):
     def __init__(self, dimensinos):
         self.dimension_targets = dimensinos
 
-    def imResize(self, im):
+    def \
+            imResize(self, im):
         """
         imResize executes two actions:
             1. setting received_dimensions

@@ -17,7 +17,7 @@ class ImRead(object):
         :param path: path to the file
         :return: image
         """
-        # 1. Checkt that provided path exists
+        # 1. Check that provided path exists
         assert os.path.exists(path), "read method receivecd incorrect path. The following path doesn't exist {}".\
             format(path)
         # 2. Read the image
