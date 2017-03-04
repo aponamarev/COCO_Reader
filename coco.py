@@ -265,8 +265,6 @@ if __name__ == "__main__":
     print "\nQueue 4 batches..."
     with tf.Session().as_default() as sess:
 
-
-
         start_timer = time.time()
         for i in range(4):
             enqueue_thread = threading.Thread(target=c.enqueue_batch, args=[sess])

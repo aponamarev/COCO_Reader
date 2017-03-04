@@ -291,7 +291,7 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def read_batch(self, step, gtbbox_flag=True):
+    def read_batch(self, step):
         """
         This function reads mc.batch_size images
 
@@ -305,20 +305,24 @@ class imdb_template(object):
         deltas_per_batch = [], [], [], [], []
         mc = self.mc
         offset = (step * mc.BATCH_SIZE) % (self.provide_epoch_size() - mc.BATCH_SIZE)
-        start = offset
-        end = start + mc.BATCH_SIZE
+        id = offset
 
-        for batch_element in xrange(start, end):
+        elements_read = 0
+
+        while elements_read<mc.BATCH_SIZE:
             '''
             1. Get img_id
             2. Read the file name and annotations
             3. Read and resize an image and annotations
             '''
             #1. Get img_id
-            img_id = self.provide_img_id(batch_element)
+            img_id = self.provide_img_id(id)
+            # .. increment id
+            id += 1
+            if not(id<self.provide_epoch_size()):
+                id = 0
             #2. Read the file name
             file_name = self.provide_img_file_name(img_id)
-
             #3. Read and resize an image and annotations
             file_path = os.path.join(self.IMAGES_PATH, file_name)
 
@@ -329,14 +333,12 @@ class imdb_template(object):
                 im = self.resize.imResize(self.imread.read(file_path))
                 # add labels
                 labels = self.provide_img_tags(img_id)
-
-                if gtbbox_flag:
-                    # add ground truth bounding boxes
-                    gtbboxes = self.provide_img_gtbboxes(img_id)
-                    # provide anchor ids for each image
-                    aids = self.__find_anchor_ids(gtbboxes)
-                    # calculate deltas for each anchor and add them to the delta_per_batch
-                    deltas = self.__estimate_deltas(gtbboxes, aids)
+                # add ground truth bounding boxes
+                gtbboxes = self.provide_img_gtbboxes(img_id)
+                # provide anchor ids for each image
+                aids = self.__find_anchor_ids(gtbboxes)
+                # calculate deltas for each anchor and add them to the delta_per_batch
+                deltas = self.__estimate_deltas(gtbboxes, aids)
 
                 # add the image, labels, bounding boxes, image ANCHOR_BOX, deltas
                 image_per_batch.append(im)
@@ -344,6 +346,8 @@ class imdb_template(object):
                 gtbox_per_batch.append(gtbboxes)
                 aids_per_batch.append(aids)
                 deltas_per_batch.append(deltas)
+
+                elements_read+=1
 
             except:
                 pass
