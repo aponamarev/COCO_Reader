@@ -31,10 +31,12 @@ class imdb_template(object):
 
         queue_size = self.mc.BATCH_SIZE * prefetched_batches
 
-        self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
+        self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=[self.mc.BATCH_SIZE] + sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
+
         self.__queue = tf.FIFOQueue(capacity=queue_size,
                                     dtypes=self.mc.OUTPUT_DTYPES,
                                     shapes=self.mc.OUTPUT_SHAPES)
+
         self.__enqueue = self.__queue.enqueue_many(self.__pipeline_inputs)
         self.__dequeue = self.__queue.dequeue()
         self.dequeue_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size)
@@ -121,8 +123,8 @@ class imdb_template(object):
 
         # check that all the values are set
         try:
-            self.ANCHOR_BOX = self.__resize_anchors(IMAGE_SIZE=value,
-                                                    FEATURE_MAP_SIZE=self.FEATURE_MAP_SIZE)  # x,y,h,w,b
+            self.ANCHOR_BOX = self.resize_anchors(IMAGE_SIZE=value,
+                                                  FEATURE_MAP_SIZE=self.FEATURE_MAP_SIZE)  # x,y,h,w,b
         except AttributeError:
             pass
         except:
@@ -146,15 +148,15 @@ class imdb_template(object):
 
         # check that all the values are set
         try:
-            self.ANCHOR_BOX = self.__resize_anchors(IMAGE_SIZE=self.INPUT_RES,
-                                                    FEATURE_MAP_SIZE=value)  # x,y,h,w,b
+            self.ANCHOR_BOX = self.resize_anchors(IMAGE_SIZE=self.INPUT_RES,
+                                                  FEATURE_MAP_SIZE=value)  # x,y,h,w,b
         except AttributeError:
             pass
         except:
             print("Unexpected error:", sys.exc_info()[0])
             raise
 
-    def __resize_anchors(self, IMAGE_SIZE, FEATURE_MAP_SIZE):
+    def resize_anchors(self, IMAGE_SIZE, FEATURE_MAP_SIZE):
         """
         Sets anchor variable.
 
@@ -198,7 +200,7 @@ class imdb_template(object):
 
         return anchors # x,y,h,w,b
 
-    def find_anchor_ids(self, img_boxes):
+    def __find_anchor_ids(self, img_boxes):
         """
         Identifies anchor ids_per_img responsible for object detection
         :param img_boxes:
@@ -219,7 +221,7 @@ class imdb_template(object):
             ids_per_img.append(aid)
         return ids_per_img
 
-    def estimate_deltas(self, bboxes, anchor_ids):
+    def __estimate_deltas(self, bboxes, anchor_ids):
         """Calculates the deltas of ANCHOR_BOX and ground truth boxes.
         :param bboxes: an array of ground trueth bounding boxes (bboxes) for an image [center_x, center_y,
         width, height]
@@ -291,62 +293,6 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def process_annotations(self):
-        """
-        Converts all annotations into a list
-
-        :return: list that can be processed tf.train.slice_input_producer
-        """
-
-        anns = {
-            'impath_processed': [],
-            'label_processed': [],
-            'gtbox_processed': [],
-            'aids_processed': [],
-            'deltas_processed': []
-        }
-
-        report_frec = 1000
-        print("Starting annotation processing. It may take a while. The progress will be reported for every {} records.".format(report_frec))
-
-        start_timer = time.time()
-
-        for _id in xrange(self.provide_epoch_size()):
-
-            img_id = self.provide_img_id(_id)
-
-            file_path = os.path.join(self.IMAGES_PATH, self.provide_img_file_name(img_id))
-
-            try:
-                # add labels
-                labels = self.provide_img_tags(img_id)
-
-                # add ground truth bounding boxes
-                gtbboxes = self.provide_img_gtbboxes(img_id, resize=False)
-                # provide anchor ids for each image
-                aids = self.find_anchor_ids(gtbboxes)
-                # calculate deltas for each anchor and add them to the delta_per_batch
-                deltas = self.estimate_deltas(gtbboxes, aids)
-
-                # add the image, labels, bounding boxes, image ANCHOR_BOX, deltas
-                anns['impath_processed'].append(file_path)
-                anns['label_processed'].append(labels)
-                anns['gtbox_processed'].append(gtbboxes)
-                anns['aids_processed'].append(aids)
-                anns['deltas_processed'].append(deltas)
-
-            except:
-                pass
-
-            if _id % report_frec == 0 and _id > 0:
-                end_timer = time.time()
-                avg_time = (end_timer - start_timer)/float(_id)
-                records_left = self.provide_epoch_size()-_id
-                print("{} annotations were processed. The average speed is {:.3f} per image. Time elapsed {:.1f} seconds. {} records remain. Remaining time {:.1f} seconds.".\
-                    format(_id, avg_time, time.time()-start_timer, records_left, records_left*avg_time))
-
-        return anns
-
     def read_batch(self, step, gtbbox_flag=True):
         """
         This function reads mc.batch_size images
@@ -390,9 +336,9 @@ class imdb_template(object):
                     # add ground truth bounding boxes
                     gtbboxes = self.provide_img_gtbboxes(img_id)
                     # provide anchor ids for each image
-                    aids = self.find_anchor_ids(gtbboxes)
+                    aids = self.__find_anchor_ids(gtbboxes)
                     # calculate deltas for each anchor and add them to the delta_per_batch
-                    deltas = self.estimate_deltas(gtbboxes, aids)
+                    deltas = self.__estimate_deltas(gtbboxes, aids)
 
                 # add the image, labels, bounding boxes, image ANCHOR_BOX, deltas
                 image_per_batch.append(im)

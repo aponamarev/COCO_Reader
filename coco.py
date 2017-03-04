@@ -1,11 +1,12 @@
 """
 COCO class is an adapter for coco dataset that ensures campatibility with ConvDet layer logic
 """
-import os, cv2, time
+import os, time
+import numpy as np
 from random import shuffle
 from pycocotools.coco import COCO
 from imdb_template import imdb_template as IMDB
-from util import visualization
+from util import visualization, convertToFixedSize, sparse_to_dense
 # Syntax: class(object) create a class inheriting from an object to allow new stype variable management
 class coco(IMDB):
     imgIds = []
@@ -183,13 +184,45 @@ class coco(IMDB):
         batch_class_ids = [self.BATCH_CLASSES.index(v) for v in label_names]
         return batch_class_ids
 
+    def read_batch(self, step):
+        image_per_batch, \
+        sparse_label_per_batch, \
+        sparse_gtbox_per_batch, \
+        sparse_aids_per_batch, \
+        sparse_deltas_per_batch = super(coco, self).read_batch(step, gtbbox_flag=True)
+
+        label_indices, \
+        bbox_indices, \
+        box_delta_values, \
+        mask_indices, \
+        box_values = convertToFixedSize(aidx_per_batch=sparse_aids_per_batch,
+                                        label_per_batch=sparse_label_per_batch,
+                                        box_delta_per_batch=sparse_deltas_per_batch,
+                                        bbox_per_batch=sparse_gtbox_per_batch)
+
+        return np.array(image_per_batch), \
+               sparse_to_dense(label_indices, [self.mc.BATCH_SIZE, self.ANCHOR_BOX, self.mc.CLASSES],
+                               np.ones(len(label_indices), dtype=np.float)),\
+               sparse_to_dense(bbox_indices, [self.mc.BATCH_SIZE, self.ANCHOR_BOX, 4],
+                   box_delta_values),\
+               np.reshape(sparse_to_dense(mask_indices,[self.mc.BATCH_SIZE, self.ANCHOR_BOX],
+                                          np.ones(len(mask_indices), dtype=np.float)),
+                          [self.mc.BATCH_SIZE, self.ANCHOR_BOX, 1]), \
+               sparse_to_dense(bbox_indices, [self.mc.BATCH_SIZE, self.ANCHOR_BOX, 4], box_values)
+
+
+
+
+
 if __name__ == "__main__":
 
-    from matplotlib import pyplot as plt
+    import tensorflow as tf
     from easydict import EasyDict as edict
 
     mc = edict()
     mc.BATCH_SIZE = 10
+    mc.OUTPUT_SHAPES = [[768, 768, 3], [32**2], [32**2], [32**2, 2]]
+    mc.OUTPUT_DTYPES = [tf.float32, tf.int32, tf.int32, tf.float32]
     mc.ANNOTATIONS_FILE_NAME = '/Users/aponamaryov/Downloads/coco_train_2014/annotations/instances_train2014.json'
     mc.BATCH_CLASSES = ['person', 'car', 'bicycle']
     mc.OUTPUT_RES = (32, 32)
@@ -199,20 +232,23 @@ if __name__ == "__main__":
     print "The name of the dataset: {}".format(c.name)
     print "Batch provides images for:  \n", c.BATCH_CLASSES
 
-    anns = c.process_annotations()
+    start_timer = time.time()
+    '''image_per_batch, \
+    label_indices, \
+    bbox_indices, \
+    box_delta_values, \
+    mask_indices, \
+    box_values = c.read_batch(5)'''
+    input_list = c.read_batch(5)
+    end_timer = time.time()
+    print "Iteration {} took {} seconds.".format(5, end_timer - start_timer)
 
-    for i in range(10000):
-        start_timer = time.time()
-        image_per_batch,\
-        label_per_batch,\
-        gtbox_per_batch,\
-        aids_per_batch,\
-        deltas_per_batch = c.read_batch(i)
-        end_timer = time.time()
-        print "Iteration {} took {} seconds.".format(i, end_timer - start_timer)
-
+    for i, e in enumerate(input_list):
+        print "Input {} has shape: {}".format(i, e.shape)
+    '''
     for id, img in enumerate(image_per_batch):
         visualization(img, labels=label_per_batch[id], bboxes=gtbox_per_batch[id], BATCH_CLASSES=c.BATCH_CLASSES)
+    '''
 
     print len(c.ANCHOR_BOX)
     c.BATCH_CLASSES = ['person', 'dog', 'cat', 'car']

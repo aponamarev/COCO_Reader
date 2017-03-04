@@ -235,7 +235,11 @@ def convertToFixedSize(aidx_per_batch, label_per_batch, box_delta_per_batch, bbo
     a list of tuples or triples to keep the consistent dimensionality across all
     images (invariant to the number of objects)"""
 
-    label_indices, bbox_indices, box_delta_values, mask_indices, box_values = [], [], [], [], []
+    label_indices = []
+    bbox_indices = []
+    box_delta_values = []
+    mask_indices = []
+    box_values = []
 
     # Initialize a tracker of unique [img_ids, anchor] tuples and counter of labels
     aidx_set = set()
@@ -255,7 +259,7 @@ def convertToFixedSize(aidx_per_batch, label_per_batch, box_delta_per_batch, bbo
                 # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
                 label_indices.append([im_num, ojb_anchor_id, obj_label])
                 mask_indices.append([im_num, ojb_anchor_id])
-                # For bounding boxes dublicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
+                # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
                 bbox_indices.extend([[im_num, ojb_anchor_id, xywh] for xywh in range(4)])
                 box_delta_values.extend(box_deltas)
                 box_values.extend(box_xyhw)
