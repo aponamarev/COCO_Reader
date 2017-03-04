@@ -5,6 +5,7 @@ import os, cv2, time
 from random import shuffle
 from pycocotools.coco import COCO
 from imdb_template import imdb_template as IMDB
+from util import visualization
 # Syntax: class(object) create a class inheriting from an object to allow new stype variable management
 class coco(IMDB):
     imgIds = []
@@ -176,30 +177,7 @@ class coco(IMDB):
                            ])
         return bboxes
 
-    def visualization(self, im, labels=None, bboxes=None):
-        text_bound = 3
-        fontScale = 0.6
-        thickness = 2
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        if not bboxes == None:
-            for idx in xrange(len(bboxes)):
-                cx, cy, w, h = [v for v in bboxes[idx]]
-                cx1, cy1 = int(cx - w / 2.0), int(cy - h / 2.0)
-                cx2, cy2 = int(cx + w / 2.0), int(cy + h / 2.0)
-                cv2.rectangle(im, (cx1, cy1), (cx2, cy2), color=256, thickness=1)
-                if not labels==None:
-                    batch_id = labels[idx]
-                    label_name = self.BATCH_CLASSES[batch_id]
-                    txt = "Tag: {}".format(label_name)
-                    txtSize = cv2.getTextSize(txt, font, fontScale, thickness)[0]
-                    cv2.putText(im, txt,
-                                (int((cx1+cx2-txtSize[0])/2.0),
-                                 cy1-text_bound\
-                                     if cy1-txtSize[1]-text_bound>text_bound else cy1+txtSize[1]+text_bound),
-                                font, fontScale, 255, thickness=thickness)
-        plt.imshow(im)
-
-    def tranform_cocoID2batchID(self, ids):
+    def transform_cocoID2batchID(self, ids):
         anns = self.coco.loadCats(ids=ids)
         label_names = [ann['name'] for ann in anns]
         batch_class_ids = [self.BATCH_CLASSES.index(v) for v in label_names]
@@ -234,7 +212,7 @@ if __name__ == "__main__":
         print "Iteration {} took {} seconds.".format(i, end_timer - start_timer)
 
     for id, img in enumerate(image_per_batch):
-        c.visualization(img, labels=label_per_batch[id], bboxes=gtbox_per_batch[id])
+        visualization(img, labels=label_per_batch[id], bboxes=gtbox_per_batch[id], BATCH_CLASSES=c.BATCH_CLASSES)
 
     print len(c.ANCHOR_BOX)
     c.BATCH_CLASSES = ['person', 'dog', 'cat', 'car']
