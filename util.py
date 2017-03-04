@@ -5,6 +5,8 @@
 import numpy as np
 import time
 import tensorflow as tf
+import cv2
+from matplotlib import pyplot as plt
 
 def iou(box1, box2):
   """Compute the Intersection-Over-Union of two given boxes.
@@ -260,6 +262,30 @@ def convertToFixedSize(aidx_per_batch, label_per_batch, box_delta_per_batch, bbo
             else:
                 num_discarded_labels += 1
     return label_indices, bbox_indices, box_delta_values, mask_indices, box_values
+
+def visualization(im, labels, bboxes, BATCH_CLASSES=None):
+    text_bound = 3
+    fontScale = 0.6
+    thickness = 2
+
+    BATCH_CLASSES = BATCH_CLASSES or [i for i in xrange(max(labels)+1)]
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    for idx in xrange(len(bboxes)):
+        cx, cy, w, h = [v for v in bboxes[idx]]
+        cx1, cy1 = int(cx - w / 2.0), int(cy - h / 2.0)
+        cx2, cy2 = int(cx + w / 2.0), int(cy + h / 2.0)
+        cv2.rectangle(im, (cx1, cy1), (cx2, cy2), color=256, thickness=1)
+        batch_id = labels[idx]
+        label_name = BATCH_CLASSES[batch_id]
+        txt = "Tag: {}".format(label_name)
+        txtSize = cv2.getTextSize(txt, font, fontScale, thickness)[0]
+        cv2.putText(im, txt,
+                    (int((cx1+cx2-txtSize[0])/2.0),
+                     cy1-text_bound\
+                         if cy1-txtSize[1]-text_bound>text_bound else cy1+txtSize[1]+text_bound),
+                    font, fontScale, 255, thickness=thickness)
+    plt.imshow(im)
 
 
 
