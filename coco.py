@@ -1,6 +1,7 @@
 """
 COCO class is an adapter for coco dataset that ensures campatibility with ConvDet layer logic
 """
+from __future__ import print_function
 import os, time, threading
 import numpy as np
 from random import shuffle
@@ -193,7 +194,7 @@ class coco(IMDB):
         sparse_label_per_batch, \
         sparse_gtbox_per_batch, \
         sparse_aids_per_batch, \
-        sparse_deltas_per_batch = super(coco, self).read_batch(step, gtbbox_flag=True)
+        sparse_deltas_per_batch = super(coco, self).read_batch(step)
 
         # Convert into a flattened out list
         label_indices, \
@@ -218,7 +219,7 @@ class coco(IMDB):
                           [batch, n_anchors, 1])
         box_values = sparse_to_dense(bbox_indices, [batch, n_anchors, 4], box_values)
 
-        return {'imgs': np.array(image_per_batch),
+        return {'imgs': np.array(image_per_batch, dtype=np.float),
                 'dense_labels': label_indices,
                 'masks': mask,
                 'bbox_deltas': bbox_deltas,
@@ -227,11 +228,11 @@ class coco(IMDB):
     def enqueue_batch(self, sess):
 
         try:
-            self.batch_drawn += 1
+            self.__batch_drawn += 1
         except:
-            self.batch_drawn = 0
+            self.__batch_drawn = 0
 
-        input_dict = c.read_batch(self.batch_drawn)
+        input_dict = self.read_batch(self.__batch_drawn)
         input_list = [input_dict['imgs'],
                       input_dict['bbox_deltas'],
                       input_dict['masks'],
@@ -259,10 +260,10 @@ if __name__ == "__main__":
     mc.IMAGES_PATH = '/Users/aponamaryov/Downloads/coco_train_2014/images'
     c = coco(coco_name="train", main_controller=mc, resize_dim=(768, 768), prefetched_batches=10)
 
-    print "The name of the dataset: {}".format(c.name)
-    print "Batch provides images for:  \n", c.BATCH_CLASSES
+    print("The name of the dataset: {}".format(c.name))
+    print("Batch provides images for:  \n", c.BATCH_CLASSES)
 
-    print "\nQueue 4 batches..."
+    print("\nQueue 4 batches...")
     with tf.Session().as_default() as sess:
 
         start_timer = time.time()
@@ -272,12 +273,12 @@ if __name__ == "__main__":
             enqueue_thread.start()
         end_timer = time.time()
 
-        print "It took {:.3f} seconds to enqueue 4 batches asynchronously.".format(end_timer-start_timer)
-        print "For comparison, let's queue in the same 4 batches sequentially."
+        print("It took {:.3f} seconds to enqueue 4 batches asynchronously.".format(end_timer-start_timer))
+        print("For comparison, let's queue in the same 4 batches sequentially.")
         start_timer = time.time()
         for _ in range(4): c.enqueue_batch(sess)
         end_timer = time.time()
-        print "It took {:.3f} seconds to enqueue 4 batches sequentially.".format(end_timer - start_timer)
+        print("It took {:.3f} seconds to enqueue 4 batches sequentially.".format(end_timer - start_timer))
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord, sess=sess)
@@ -290,13 +291,13 @@ if __name__ == "__main__":
         coord.join(threads)
         sess.close()
 
-        print "Images have the following shape:", imgs.shape
-        print "bbox_deltas have the following shape:", bbox_deltas.shape
-        print "masks have the following shape:", masks.shape
-        print "dense_labels have the following shape:", dense_labels.shape
-        print "bbox_values have the following shape:", bbox_values.shape
+        print("Images have the following shape:", imgs.shape)
+        print("bbox_deltas have the following shape:", bbox_deltas.shape)
+        print("masks have the following shape:", masks.shape)
+        print("dense_labels have the following shape:", dense_labels.shape)
+        print("bbox_values have the following shape:", bbox_values.shape)
 
-    print len(c.ANCHOR_BOX)
+    print(len(c.ANCHOR_BOX))
     c.BATCH_CLASSES = ['person', 'dog', 'cat', 'car']
-    print c.BATCH_CLASSES
-    print len(c.imgIds)
+    print(c.BATCH_CLASSES)
+    print(len(c.imgIds))

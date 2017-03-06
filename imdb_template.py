@@ -37,7 +37,7 @@ class imdb_template(object):
 
         self.__enqueue = self.queue.enqueue_many(self.__pipeline_inputs)
         self.__dequeue = self.queue.dequeue()
-        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size)
+        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size, num_threads=2)
 
 
     def enqueue_batch(self, inputs, sess):

@@ -1,6 +1,6 @@
 __author__ = 'tsungyi'
 
-from pycocotools import _mask
+import _mask
 #import pycocotools._mask as _mask
 
 # Interface for manipulating masks stored in RLE format.

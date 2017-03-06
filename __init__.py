@@ -1,2 +1,2 @@
-__author__ = ‘aponamarev’
+__author__ = 'aponamarev'
 from coco import coco
