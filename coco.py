@@ -227,19 +227,36 @@ class coco(IMDB):
 
     def enqueue_batch(self, sess):
 
-        try:
-            self.__batch_drawn += 1
-        except:
-            self.__batch_drawn = 0
+        while True:
 
-        input_dict = self.read_batch(self.__batch_drawn)
-        input_list = [input_dict['imgs'],
-                      input_dict['bbox_deltas'],
-                      input_dict['masks'],
-                      input_dict['dense_labels'],
-                      input_dict['bbox_values']]
+            queue_size = sess.run(self.queue.size())
 
-        super(coco, self).enqueue_batch(input_list, sess)
+            #print("On parallel thread: enqueue_batch - queue_size: {}, queue_capacity: {}".format(queue_size, self.queue_capacity))
+
+            if queue_size >= self.queue_capacity:
+                #print("On parallel thread: queue successfully filled in. exiting enqueue_batch")
+                break
+
+            try:
+                self.__batch_drawn += 1
+            except:
+                self.__batch_drawn = 0
+
+            input_dict = self.read_batch(self.__batch_drawn)
+            input_list = [input_dict['imgs'],
+                          input_dict['bbox_deltas'],
+                          input_dict['masks'],
+                          input_dict['dense_labels'],
+                          input_dict['bbox_values']]
+
+            super(coco, self).enqueue_batch(input_list, sess)
+
+    def fill_queue(self, sess):
+
+        t = threading.Thread(target=self.enqueue_batch, args=[sess])
+        t.isDaemon()
+        t.start()
+
 
 
 
