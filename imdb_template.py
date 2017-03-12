@@ -5,7 +5,7 @@ General image database wrapper that provides a common methods for image processi
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-import sys, os, time
+import sys, os
 from util import batch_iou
 from ImRead import ImRead
 from Resize import Resize
@@ -27,17 +27,17 @@ class imdb_template(object):
 
         # Define variables that will be used for prefetching with TensorFlow
 
-        queue_size = self.mc.BATCH_SIZE * prefetched_batches
-
         self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=[self.mc.BATCH_SIZE] + sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
 
-        self.queue = tf.FIFOQueue(capacity=queue_size,
+        self.queue_capacity = self.mc.BATCH_SIZE * prefetched_batches
+        self.queue = tf.FIFOQueue(capacity=self.queue_capacity,
                                   dtypes=self.mc.OUTPUT_DTYPES,
                                   shapes=self.mc.OUTPUT_SHAPES)
 
         self.__enqueue = self.queue.enqueue_many(self.__pipeline_inputs)
         self.__dequeue = self.queue.dequeue()
-        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE, capacity=queue_size, num_threads=2)
+        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE,
+                                        capacity=prefetched_batches)
 
 
     def enqueue_batch(self, inputs, sess):
