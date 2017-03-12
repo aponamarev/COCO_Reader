@@ -5,7 +5,7 @@ General image database wrapper that provides a common methods for image processi
 import tensorflow as tf
 import numpy as np
 import sys, os, time
-"""
+
 from .util import batch_iou
 from .ImRead import ImRead
 from .Resize import Resize
@@ -13,6 +13,7 @@ from .Resize import Resize
 from util import batch_iou
 from ImRead import ImRead
 from Resize import Resize
+"""
 
 class IMDB(object):
 

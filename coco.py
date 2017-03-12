@@ -278,7 +278,6 @@ if __name__=="__main__":
                              placeholder_deltas:deltas,
                              placeholder_bbox_values:bbox_values}
                 sess.run(enqueue_op, feed_dict=feed_dict)
-                print(".", sep="", end="")
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord, sess=sess)
