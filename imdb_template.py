@@ -2,50 +2,40 @@
 """
 General image database wrapper that provides a common methods for image processing
 """
-from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-import sys, os
+import sys, os, time
+"""
+from .util import batch_iou
+from .ImRead import ImRead
+from .Resize import Resize
+"""
 from util import batch_iou
 from ImRead import ImRead
 from Resize import Resize
 
-class imdb_template(object):
+class IMDB(object):
 
     ANCHOR_BOX = []
     INPUT_RES = None
     FEATURE_MAP_SIZE = None
     IMAGES_PATH = "path to be provided"
 
-    def __init__(self, main_controller, resize_dim=(1024, 1024), feature_map_size=(32, 32), prefetched_batches=5):
+    def __init__(self, main_controller, resize_dim=(1024, 1024), feature_map_size=(32, 32)):
 
+        self.samples_read_counter = 0
         self.mc = main_controller
         self.FEATURE_MAP_SIZE = feature_map_size  # width, height
         self.INPUT_RES = resize_dim  # width, height
         self.imread = ImRead(bgr2rgd_flag=False)
         self.resize = Resize(dimensinos=resize_dim)
 
-        # Define variables that will be used for prefetching with TensorFlow
-
-        self.__pipeline_inputs = [tf.placeholder(dtype=dt, shape=[self.mc.BATCH_SIZE] + sh) for dt, sh in zip(self.mc.OUTPUT_DTYPES, self.mc.OUTPUT_SHAPES)]
-
-        self.queue_capacity = self.mc.BATCH_SIZE * prefetched_batches
-        self.queue = tf.FIFOQueue(capacity=self.queue_capacity,
-                                  dtypes=self.mc.OUTPUT_DTYPES,
-                                  shapes=self.mc.OUTPUT_SHAPES)
-
-        self.__enqueue = self.queue.enqueue_many(self.__pipeline_inputs)
-        self.__dequeue = self.queue.dequeue()
-        self.get_batch = tf.train.batch(self.__dequeue, batch_size=self.mc.BATCH_SIZE,
-                                        capacity=prefetched_batches)
-
-
-    def enqueue_batch(self, inputs, sess):
-        assert len(self.__pipeline_inputs)==len(inputs),\
-            "Provided inputs are incorrect. Method is expecting a list of {} elements. {} elements were provided.".\
-                format(len(self.__pipeline_inputs), len(inputs))
-        feed_dict = {pipeline_input: value for pipeline_input, value in zip(self.__pipeline_inputs, inputs)}
-        sess.run(self.__enqueue, feed_dict = feed_dict)
+    @property
+    def samples_read_counter(self):
+        return self.__samples_read_counter
+    @samples_read_counter.setter
+    def samples_read_counter(self, value):
+        self.__samples_read_counter = value if value<self.epoch_size() else 0
 
 
     @property
@@ -55,25 +45,6 @@ class imdb_template(object):
     @mc.setter
     def mc(self, main_controller):
         # Let's verify all important attributes
-        try:
-            assert type(main_controller.OUTPUT_SHAPES) == list,\
-                "Please provide the list of OUTPUT_SHAPES ({} was provided). This list will be used to describe tensors to be prefetched in TensorFlow".\
-                    format(type(main_controller.OUTPUT_SHAPES).__name__)
-        except:
-            raise AttributeError("mc.OUTPUT_SHAPES was not provided. Please provide the list of OUTPUT_SHAPES. This list will be used to describe tensors to be prefetched in TensorFlow")
-
-        try:
-            assert type(main_controller.OUTPUT_DTYPES) == list, \
-                "Please provide the list of OUTPUT_DTYPES ({} was provided). This list will be used to describe the data format of tensors to be prefetched in TensorFlow". \
-                    format(type(main_controller.OUTPUT_DTYPES).__name__)
-        except:
-            raise AttributeError("mc.OUTPUT_DTYPES was not provided. Please provide the list of OUTPUT_DTYPES. This list will be used to describe the data format of tensors to be prefetched in TensorFlow")
-
-        # make sure that the length of OUTPUT_SHAPES and OUTPUT_DTYPES is the same
-        assert len(main_controller.OUTPUT_SHAPES)==len(main_controller.OUTPUT_DTYPES),\
-            "Incorrect mc.OUTPUT_SHAPES (len={}) and mc.OUTPUT_DTYPES (len={}) provided. These attributes should have the same legth.".\
-                format(len(main_controller.OUTPUT_SHAPES), len(main_controller.OUTPUT_DTYPES))
-
         try:
             assert type(main_controller.OUTPUT_RES) == list, \
                 "Please provide the output resolution mc.OUTPUT_RES that describes feature maps size of FCN as a list [width, height]. Will be used for bbox setup"
@@ -198,7 +169,7 @@ class imdb_template(object):
 
         return anchors # x,y,h,w,b
 
-    def __find_anchor_ids(self, img_boxes):
+    def find_anchor_ids(self, img_boxes):
         """
         Identifies anchor ids_per_img responsible for object detection
         :param img_boxes:
@@ -219,7 +190,7 @@ class imdb_template(object):
             ids_per_img.append(aid)
         return ids_per_img
 
-    def __estimate_deltas(self, bboxes, anchor_ids):
+    def estimate_deltas(self, bboxes, anchor_ids):
         """Calculates the deltas of ANCHOR_BOX and ground truth boxes.
         :param bboxes: an array of ground trueth bounding boxes (bboxes) for an image [center_x, center_y,
         width, height]
@@ -245,7 +216,7 @@ class imdb_template(object):
             delta_per_img.append(delta)
         return delta_per_img
 
-    def provide_img_file_name(self, id):
+    def __provide_img_file_name(self, id):
         """
         Protocol describing the implementation of a method that provides the name of the image file based on
         an image id. Should be implemented for each of the datasets separately
@@ -254,7 +225,7 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def provide_img_tags(self, id):
+    def __provide_img_tags(self, id):
         """
         Protocol describing the implementation of a method that provides tags for the image file based on
         an image id. Should be implemented for each of the datasets separately
@@ -263,17 +234,7 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def provide_img_gtbboxes(self, id, resize=True):
-        """
-        Protocol describing the implementation of a method that provides ground truth bounding boxes
-        for the image file based on an image id. Should be implemented for each of the datasets separately
-        :param id: dataset specific image id
-        :return: an array containing the list of bounding boxes with the following format
-        [center_x, center_y, width, height]
-        """
-        raise NotImplementedError
-
-    def provide_img_id(self, id):
+    def __provide_img_id(self, id):
         """
         Protocol describing the implementation of a method that provides image id
         for the dataset. This image id will be used in all subsequent methods.
@@ -283,76 +244,13 @@ class imdb_template(object):
         """
         raise NotImplementedError
 
-    def provide_epoch_size(self):
+    def epoch_size(self):
         """
         Protocol describing the implementation of a method that provides the size of the epoch.
         Should be implemented for each of the datasets separately
         :return: int - the size of the epoch
         """
         raise NotImplementedError
-
-    def read_batch(self, step):
-        """
-        This function reads mc.batch_size images
-
-        :return: image_per_batch, label_per_batch, delta_per_batch, \
-        aidx_per_batch, gtbox_per_batch[cx,cy,w,h]
-        """
-        image_per_batch,\
-        label_per_batch,\
-        gtbox_per_batch,\
-        aids_per_batch,\
-        deltas_per_batch = [], [], [], [], []
-        mc = self.mc
-        offset = (step * mc.BATCH_SIZE) % (self.provide_epoch_size() - mc.BATCH_SIZE)
-        id = offset
-
-        elements_read = 0
-
-        while elements_read<mc.BATCH_SIZE:
-            '''
-            1. Get img_id
-            2. Read the file name and annotations
-            3. Read and resize an image and annotations
-            '''
-            #1. Get img_id
-            img_id = self.provide_img_id(id)
-            # .. increment id
-            id += 1
-            if not(id<self.provide_epoch_size()):
-                id = 0
-            #2. Read the file name
-            file_name = self.provide_img_file_name(img_id)
-            #3. Read and resize an image and annotations
-            file_path = os.path.join(self.IMAGES_PATH, file_name)
-
-            gtbboxes = []
-            aids = []
-            deltas = []
-            try:
-                im = self.resize.imResize(self.imread.read(file_path))
-                # add labels
-                labels = self.provide_img_tags(img_id)
-                # add ground truth bounding boxes
-                gtbboxes = self.provide_img_gtbboxes(img_id)
-                # provide anchor ids for each image
-                aids = self.__find_anchor_ids(gtbboxes)
-                # calculate deltas for each anchor and add them to the delta_per_batch
-                deltas = self.__estimate_deltas(gtbboxes, aids)
-
-                # add the image, labels, bounding boxes, image ANCHOR_BOX, deltas
-                image_per_batch.append(im)
-                label_per_batch.append(labels)
-                gtbox_per_batch.append(gtbboxes)
-                aids_per_batch.append(aids)
-                deltas_per_batch.append(deltas)
-
-                elements_read+=1
-
-            except:
-                pass
-
-        return image_per_batch, label_per_batch, gtbox_per_batch, aids_per_batch, deltas_per_batch
 
 
 

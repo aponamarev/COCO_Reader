@@ -230,7 +230,7 @@ def safe_exp(w, thresh):
 
     out = lin_region*lin_out + (1.-lin_region)*exp_out
   return out
-def convertToFixedSize(aidx_per_batch, label_per_batch, box_delta_per_batch, bbox_per_batch):
+def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
     """Convert a 2d arrays of inconsistent size (varies based on n of objests) into
     a list of tuples or triples to keep the consistent dimensionality across all
     images (invariant to the number of objects)"""
@@ -245,26 +245,26 @@ def convertToFixedSize(aidx_per_batch, label_per_batch, box_delta_per_batch, bbo
     aidx_set = set()
     label_counter = 0
     num_discarded_labels = 0
-    for im_num in xrange(len(label_per_batch)):
-        for lbl_num in xrange(len(label_per_batch[im_num])):
-            label_counter += 1
-            # To keep a track of added label/ANCHOR_BOX create a list of ANCHOR_BOX
-            # (for each image [i]) corresponding to objects
-            ojb_anchor_id = aidx_per_batch[im_num][lbl_num]
-            obj_label = label_per_batch[im_num][lbl_num]
-            box_deltas = box_delta_per_batch[im_num][lbl_num]
-            box_xyhw = bbox_per_batch[im_num][lbl_num]
-            if (im_num, ojb_anchor_id) not in aidx_set:
-                aidx_set.add((im_num, ojb_anchor_id))
-                # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
-                label_indices.append([im_num, ojb_anchor_id, obj_label])
-                mask_indices.append([im_num, ojb_anchor_id])
-                # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
-                bbox_indices.extend([[im_num, ojb_anchor_id, xywh] for xywh in range(4)])
-                box_delta_values.extend(box_deltas)
-                box_values.extend(box_xyhw)
-            else:
-                num_discarded_labels += 1
+
+    for lbl_num in range(len(labels)):
+        label_counter += 1
+        # To keep a track of added label/ANCHOR_BOX create a list of ANCHOR_BOX
+        # (for each image [i]) corresponding to objects
+        ojb_anchor_id = aidx[lbl_num]
+        obj_label = labels[lbl_num]
+        box_deltas = boxes_deltas[lbl_num]
+        box_xyhw = bboxes[lbl_num]
+        if (ojb_anchor_id) not in aidx_set:
+            aidx_set.add(ojb_anchor_id)
+            # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
+            label_indices.append([ojb_anchor_id, obj_label])
+            mask_indices.append([ojb_anchor_id])
+            # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
+            bbox_indices.extend([[ojb_anchor_id, xywh] for xywh in range(4)])
+            box_delta_values.extend(box_deltas)
+            box_values.extend(box_xyhw)
+        else:
+            num_discarded_labels += 1
     return label_indices, bbox_indices, box_delta_values, mask_indices, box_values
 
 def visualization(im, labels, bboxes, BATCH_CLASSES=None):
@@ -272,7 +272,7 @@ def visualization(im, labels, bboxes, BATCH_CLASSES=None):
     fontScale = 0.6
     thickness = 2
 
-    BATCH_CLASSES = BATCH_CLASSES or [i for i in xrange(max(labels)+1)]
+    BATCH_CLASSES = BATCH_CLASSES or [i for i in range(max(labels)+1)]
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     for idx in xrange(len(bboxes)):

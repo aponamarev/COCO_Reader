@@ -7,7 +7,6 @@ Implementation for others classes will be explored later. Current implementation
 The class is initialized with:
     :param: dimensions - 1d [height, width] array
 """
-from __future__ import print_function
 import cv2, sys
 import numpy as np
 

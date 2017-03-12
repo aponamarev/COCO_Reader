@@ -33,4 +33,4 @@ if __name__ == '__main__':
     imRead = ImRead()
     im = imRead.read(path=path)
     plt.imshow(toimage(im))
-    print "imRead.read was executed correctly"
+    print("imRead.read was executed correctly")
