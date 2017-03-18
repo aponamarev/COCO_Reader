@@ -28,7 +28,7 @@ class IMDB(object):
         self.mc = main_controller
         self.FEATURE_MAP_SIZE = feature_map_size  # width, height
         self.INPUT_RES = resize_dim  # width, height
-        self.imread = ImRead(bgr2rgd_flag=False)
+        self.imread = ImRead(bgr2rgd_flag=True)
         self.resize = Resize(dimensinos=resize_dim)
 
     @property

@@ -169,6 +169,13 @@ class coco(IMDB):
             file_path = os.path.join(self.IMAGES_PATH, file_name)
             try:
                 im = self.resize.imResize(self.imread.read(file_path))
+                w,h,c = im.shape
+                im = np.reshape(im, [-1,c])
+                mean = np.mean(im, axis=0, dtype=np.float32)
+                im = np.subtract(im, mean)
+                std = np.std(im, axis=0, dtype=np.float32)
+                im = np.divide(im,std)
+                im = np.reshape(im,[w,h,c])
                 gtbboxes = [self.resize.bboxResize(gtbbox) for gtbbox in gtbboxes]
                 # provide anchor ids for each image
                 aids = self.find_anchor_ids(gtbboxes)
